@@ -199,9 +199,97 @@ package WebUI v0.0.1 {
     sub set_logger( $func, $user_data )                    { }
     sub get_last_error_number()                            { }
     sub clean()                                            { }
+
     # Utils...
     sub _find_browser ( $desired_browser = AnyBrowser() ) {
-        return ( '/Applications/Safari.app', Safari() ) if $desired_browser == Safari() && $^O eq 'darwin';
+        my @candidates;
+        if ( $^O eq 'MSWin32' ) {
+            my $sys_drive = $ENV{'SystemDrive'} || 'C:';
+            my @roots     = grep { defined && length && -d } (
+                $ENV{'ProgramFiles'},                $ENV{'ProgramFiles(x86)'},
+                $ENV{'ProgramW6432'},                $ENV{'LOCALAPPDATA'},
+                $ENV{'APPDATA'},                     $sys_drive . '\Program Files',
+                $sys_drive . '\Program Files (x86)', 'C:\Program Files',
+                'C:\Program Files (x86)'
+            );
+            my %seen;
+            @roots = grep { !$seen{ lc $_ }++ } @roots;
+            for my $r (@roots) {
+                push @candidates,    #
+                    [ Edge(), $r . '\Microsoft\Edge\Application\msedge.exe' ], [ Edge(), $r . '\Microsoft\Edge Beta\Application\msedge.exe' ],
+                    [ Edge(), $r . '\Microsoft\Edge Dev\Application\msedge.exe' ],
+                    #
+                    [ Chrome(), $r . '\Google\Chrome\Application\chrome.exe' ], [ Chromium(), $r . '\Chromium\Application\chrome.exe' ],
+                    #
+                    [ Brave(),  $r . '\BraveSoftware\Brave-Browser\Application\brave.exe' ], [ Firefox(), $r . '\Mozilla Firefox\firefox.exe' ],
+                    [ Opera(),  $r . '\Opera\launcher.exe' ],                                [ Vivaldi(), $r . '\Vivaldi\Application\vivaldi.exe' ],
+                    [ Yandex(), $r . '\Yandex\YandexBrowser\Application\browser.exe' ];
+            }
+            warn;
+
+            # Check Windows Registry App Paths
+            my @reg_map = (
+                [ Edge(),    'msedge.exe' ],
+                [ Chrome(),  'chrome.exe' ],
+                [ Brave(),   'brave.exe' ],
+                [ Firefox(), 'firefox.exe' ],
+                [ Opera(),   'launcher.exe' ],
+                [ Vivaldi(), 'vivaldi.exe' ]
+            );
+            for my $b_type (@reg_map) {
+                my $exe = $b_type->[1];
+                for my $hive (qw[HKLM HKCU]) {
+                    my $out = `reg query "$hive\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\$exe" /ve 2>nul`;
+                    if ( $out && $out =~ /REG_SZ\s+(.*)$/mi ) {
+                        my $p = $1;
+                        $p =~ s/^\s+|\s+$//g;
+                        $p =~ s/^"(.*)"$/$1/;
+                        push @candidates, [ $b_type->[0], $p ] if $p && -f $p;
+                    }
+                }
+            }
+            warn;
+
+            # Check where.exe
+            for my $b_type (@reg_map) {
+                my $exe = $b_type->[1];
+                my $out = `where.exe "$exe" 2>nul`;
+                if ($out) {
+                    for my $p ( split /\r?\n/, $out ) {
+                        $p =~ s/^\s+|\s+$//g;
+                        push @candidates, [ $b_type->[0], $p ] if $p && -f $p;
+                    }
+                }
+            }
+        }
+        elsif ( $^O eq 'darwin' ) {
+            @candidates = (
+                [ Chrome(),  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' ],
+                [ Edge(),    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge' ],
+                [ Brave(),   '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser' ],
+                [ Firefox(), '/Applications/Firefox.app/Contents/MacOS/firefox' ]
+            );
+        }
+        else {
+            my @path_dirs = split( /:/, $ENV{PATH} // '' );
+            for my $p (@path_dirs) {
+                push @candidates, [ Chrome(), "$p/google-chrome-stable" ], [ Chrome(), "$p/google-chrome" ], [ Chromium(), "$p/chromium" ],
+                    [ Edge(), "$p/microsoft-edge-stable" ], [ Brave(), "$p/brave-browser" ], [ Firefox(), "$p/firefox" ];
+            }
+        }
+        warn "[DEBUG] _find_browser looking for desired_browser ID: $desired_browser\n";
+        for my $item (@candidates) {
+            my ( $b_type, $path ) = @$item;
+            my $exists = ( -f $path ) ? 1 : 0;
+            warn "[DEBUG] Candidate check -> Type: $b_type, Path: $path (Exists: $exists)\n" if $exists;
+            if ( $desired_browser == AnyBrowser() || $desired_browser == ChromiumBased() || $desired_browser == $b_type ) {
+                if ($exists) {
+                    warn "[DEBUG] FOUND matching browser: $path (Type: $b_type)\n";
+                    return ( $path, $b_type );
+                }
+            }
+        }
+        warn "[DEBUG] _find_browser could not find a valid browser matching $desired_browser\n";
         return ( undef, NoBrowser() );
     }
 };
