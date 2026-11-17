@@ -84,6 +84,7 @@ package WebUI v0.0.1 {
         method return_string($val)   { }
         method return_bool($val)     { }
     }
+    typedef Runtime => Enum [qw[Deno Bun NodeJS None]];
     typedef Event => Enum [
         [ 'WEBUI_EVENT_DISCONNECTED' => 0 ],    # Window disconnection event
         'WEBUI_EVENT_CONNECTED',                # Window connection event
@@ -91,10 +92,22 @@ package WebUI v0.0.1 {
         'WEBUI_EVENT_NAVIGATION',               # Window navigation event
         'WEBUI_EVENT_CALLBACK'                  # Function call event
     ];
-    sub set_context( $win, $element, $context ) { }
-    sub get_context($event)                     { }
-    sub set_event_blocking( $win, $bool )       { }
-    #
+    typedef Browser => Enum [
+        'NoBrowser',                            # 0. No web browser
+        'AnyBrowser',                           # 1. Default recommended web browser
+        'Chrome',                               # 2. Google Chrome
+        'Firefox',                              # 3. Mozilla Firefox
+        'Edge',                                 # 4. Microsoft Edge
+        'Safari',                               # 5. Apple Safari
+        'Chromium',                             # 6. The Chromium Project
+        'Opera',                                # 7. Opera Browser
+        'Brave',                                # 8. The Brave Browser
+        'Vivaldi',                              # 9. The Vivaldi Browser
+        'Epic',                                 # 10. The Epic Browser
+        'Yandex',                               # 11. The Yandex Browser
+        'ChromiumBased',                        # 12. Any Chromium based browser
+        'Webview'                               # 13. WebView (Non-web-browser)
+    ];
     typedef Config => Enum [
 
         # Wait for browser to connect before show() returns.
@@ -125,6 +138,10 @@ package WebUI v0.0.1 {
         # Default: false
         'asynchronous_response'
     ];
+    sub set_context( $win, $element, $context ) { }
+    sub get_context($event)                     { }
+    sub set_event_blocking( $win, $bool )       { }
+    #
     sub set_config( $option, $status ) { }
     sub set_timeout($seconds)          { }
     sub run( $win, $script )           { }
@@ -139,7 +156,6 @@ package WebUI v0.0.1 {
 
         # Actual call is $win, $script, $timeout, $buffer, $buffer_length
     }
-    typedef Runtime => Enum [qw[Deno Bun NodeJS None]];
     sub set_runtime( $win, $runtime ) { }
 
     sub send_raw( $win, $function, $raw ) {
@@ -156,18 +172,20 @@ package WebUI v0.0.1 {
     sub set_root_folder( $win, $path )            { }
     sub set_default_root_folder($path)            { }
     sub get_mime_type($file)                      { }
-    sub get_best_browser($win)                    { }
-    sub browser_exist($id)                        { }
-    sub set_profile( $win, $name, $path )         { }
-    sub set_proxy( $win, $proxy )                 { }
-    sub set_browser_folder($path)                 { }
-    sub delete_profile($win)                      { }
-    sub delete_all_profiles()                     { }
-    sub get_port($win)                            { }
-    sub set_port($win)                            { }
-    sub get_free_port()                           { }
-    sub get_parent_process_id($win)               { }
-    sub get_child_process_id($win)                { }
+
+    sub get_best_browser($win) {
+    }
+    sub browser_exist($id)                { }
+    sub set_profile( $win, $name, $path ) { }
+    sub set_proxy( $win, $proxy )         { }
+    sub set_browser_folder($path)         { }
+    sub delete_profile($win)              { }
+    sub delete_all_profiles()             { }
+    sub get_port($win)                    { }
+    sub set_port($win)                    { }
+    sub get_free_port()                   { }
+    sub get_parent_process_id($win)       { }
+    sub get_child_process_id($win)        { }
 
     sub get_hwnd($win) {
 
