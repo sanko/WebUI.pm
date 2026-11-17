@@ -197,5 +197,10 @@ package WebUI v0.0.1 {
     sub set_logger( $func, $user_data )                    { }
     sub get_last_error_number()                            { }
     sub clean()                                            { }
+    # Utils...
+    sub _find_browser ( $desired_browser = AnyBrowser() ) {
+        return ( '/Applications/Safari.app', Safari() ) if $desired_browser == Safari() && $^O eq 'darwin';
+        return ( undef, NoBrowser() );
+    }
 };
 1;
