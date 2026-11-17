@@ -5,7 +5,7 @@ package WebUI v0.0.1 {
     use Affix           qw[:all];
     use Acme::Parataxis qw[];
     #
-    use Data::Printer;
+    #use Data::Printer;
     #
     my $WEBUI_MAX_IDS = 999999;    # For now
     my $WEBUI_ID      = 0;
