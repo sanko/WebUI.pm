@@ -79,6 +79,8 @@ package WebUI v0.0.1 {
         method get_bool_at($index)   { }
         method get_size()            { }
         method get_size_at($index)   { }
+        method get_bytes()           { }
+        method get_bytes_at($index)  { }
         method return_int($val)      { }
         method return_float($val)    { }
         method return_string($val)   { }
