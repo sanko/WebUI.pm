@@ -13,7 +13,7 @@ jobs:
             "arch": "x86_64",
             "toolchain": "gcc",
             "variant": "firefox-installed",
-            "prepare": "pkg update -f && pkg install -y perl5 curl firefox"
+            "prepare": "env IGNORE_OSVERSION=yes pkg update -f && env IGNORE_OSVERSION=yes pkg install -y perl5 curl firefox"
           },
           {
             "platform_name": "freebsd",
@@ -21,12 +21,13 @@ jobs:
             "arch": "x86_64",
             "toolchain": "gcc",
             "variant": "no-browser-server-only",
-            "prepare": "pkg update -f && pkg install -y perl5 curl"
+            "prepare": "env IGNORE_OSVERSION=yes pkg update -f && env IGNORE_OSVERSION=yes pkg install -y perl5 curl"
           }
         ]
       os_version: 14.1
       task: |
         export AUTOMATED_TESTING=1 AUTHOR_TESTING=0
+        export IGNORE_OSVERSION=yes
         curl -fsSL https://cpanmin.us -o /tmp/cpanmin.pl
         perl /tmp/cpanmin.pl --notest App::cpanminus Module::Build::Tiny
         rm -f /tmp/cpanmin.pl
