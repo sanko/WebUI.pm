@@ -201,33 +201,34 @@ package WebUI v0.0.1 {
     sub clean()                                            { }
 
     # Utils...
+    my sub _is_chromium_based ($browser_id) {
+        state %chromium_types = map { $_ => 1 } ( Chrome(), Chromium(), Edge(), Brave(), Opera(), Vivaldi(), Epic(), Yandex() );
+        return $chromium_types{$browser_id} // 0;
+    }
+
     sub _find_browser ( $desired_browser = AnyBrowser() ) {
         my @candidates;
         if ( $^O eq 'MSWin32' ) {
             my $sys_drive = $ENV{'SystemDrive'} || 'C:';
             my @roots     = grep { defined && length && -d } (
-                $ENV{'ProgramFiles'},                $ENV{'ProgramFiles(x86)'},
-                $ENV{'ProgramW6432'},                $ENV{'LOCALAPPDATA'},
-                $ENV{'APPDATA'},                     $sys_drive . '\Program Files',
-                $sys_drive . '\Program Files (x86)', 'C:\Program Files',
-                'C:\Program Files (x86)'
+                $ENV{'ProgramFiles'},                                               $ENV{'ProgramFiles(x86)'},
+                $ENV{'ProgramW6432'},                                               $ENV{'LOCALAPPDATA'},
+                $ENV{'LOCALAPPDATA'} ? ( $ENV{'LOCALAPPDATA'} . '\Programs' ) : (), $ENV{'APPDATA'},
+                $sys_drive . '\Program Files',                                      $sys_drive . '\Program Files (x86)',
+                'C:\Program Files',                                                 'C:\Program Files (x86)'
             );
-            my %seen;
-            @roots = grep { !$seen{ lc $_ }++ } @roots;
+            my %seen_roots;
+            @roots = grep { !$seen_roots{ lc $_ }++ } @roots;
             for my $r (@roots) {
-                push @candidates,    #
-                    [ Edge(), $r . '\Microsoft\Edge\Application\msedge.exe' ], [ Edge(), $r . '\Microsoft\Edge Beta\Application\msedge.exe' ],
-                    [ Edge(), $r . '\Microsoft\Edge Dev\Application\msedge.exe' ],
-                    #
-                    [ Chrome(), $r . '\Google\Chrome\Application\chrome.exe' ], [ Chromium(), $r . '\Chromium\Application\chrome.exe' ],
-                    #
-                    [ Brave(),  $r . '\BraveSoftware\Brave-Browser\Application\brave.exe' ], [ Firefox(), $r . '\Mozilla Firefox\firefox.exe' ],
-                    [ Opera(),  $r . '\Opera\launcher.exe' ],                                [ Vivaldi(), $r . '\Vivaldi\Application\vivaldi.exe' ],
+                push @candidates, [ Edge(), $r . '\Microsoft\Edge\Application\msedge.exe' ],
+                    [ Edge(),   $r . '\Microsoft\Edge Beta\Application\msedge.exe' ], [ Edge(), $r . '\Microsoft\Edge Dev\Application\msedge.exe' ],
+                    [ Chrome(), $r . '\Google\Chrome\Application\chrome.exe' ],              [ Chromium(), $r . '\Chromium\Application\chrome.exe' ],
+                    [ Brave(),  $r . '\BraveSoftware\Brave-Browser\Application\brave.exe' ], [ Firefox(),  $r . '\Mozilla Firefox\firefox.exe' ],
+                    [ Opera(),  $r . '\Opera\launcher.exe' ],                                [ Vivaldi(),  $r . '\Vivaldi\Application\vivaldi.exe' ],
                     [ Yandex(), $r . '\Yandex\YandexBrowser\Application\browser.exe' ];
             }
-            warn;
 
-            # Check Windows Registry App Paths
+            # Check Windows Registry App Paths (64-bit and 32-bit views)
             my @reg_map = (
                 [ Edge(),    'msedge.exe' ],
                 [ Chrome(),  'chrome.exe' ],
@@ -239,18 +240,19 @@ package WebUI v0.0.1 {
             for my $b_type (@reg_map) {
                 my $exe = $b_type->[1];
                 for my $hive (qw[HKLM HKCU]) {
-                    my $out = `reg query "$hive\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\$exe" /ve 2>nul`;
-                    if ( $out && $out =~ /REG_SZ\s+(.*)$/mi ) {
-                        my $p = $1;
-                        $p =~ s/^\s+|\s+$//g;
-                        $p =~ s/^"(.*)"$/$1/;
-                        push @candidates, [ $b_type->[0], $p ] if $p && -f $p;
+                    for my $view ( '', ' /reg:32', ' /reg:64' ) {
+                        my $out = `reg query "$hive\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\$exe" /ve$view 2>nul`;
+                        if ( $out && $out =~ /REG_SZ\s+(.*)$/mi ) {
+                            my $p = $1;
+                            $p =~ s/^\s+|\s+$//g;
+                            $p =~ s/^"(.*)"$/$1/;
+                            push @candidates, [ $b_type->[0], $p ] if $p && -f $p;
+                        }
                     }
                 }
             }
-            warn;
 
-            # Check where.exe
+            # Check where.exe as fallback
             for my $b_type (@reg_map) {
                 my $exe = $b_type->[1];
                 my $out = `where.exe "$exe" 2>nul`;
@@ -263,34 +265,59 @@ package WebUI v0.0.1 {
             }
         }
         elsif ( $^O eq 'darwin' ) {
-            @candidates = (
-                [ Chrome(),  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' ],
-                [ Edge(),    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge' ],
-                [ Brave(),   '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser' ],
-                [ Firefox(), '/Applications/Firefox.app/Contents/MacOS/firefox' ]
-            );
+            my @app_dirs = ( '/Applications', ( $ENV{HOME} ? "$ENV{HOME}/Applications" : () ) );
+            for my $dir (@app_dirs) {
+                push @candidates, [ Chrome(), "$dir/Google Chrome.app/Contents/MacOS/Google Chrome" ],
+                    [ Chromium(), "$dir/Chromium.app/Contents/MacOS/Chromium" ], [ Edge(), "$dir/Microsoft Edge.app/Contents/MacOS/Microsoft Edge" ],
+                    [ Brave(),    "$dir/Brave Browser.app/Contents/MacOS/Brave Browser" ], [ Firefox(), "$dir/Firefox.app/Contents/MacOS/firefox" ],
+                    [ Opera(),    "$dir/Opera.app/Contents/MacOS/Opera" ],                 [ Vivaldi(), "$dir/Vivaldi.app/Contents/MacOS/Vivaldi" ],
+                    [ Safari(),   "$dir/Safari.app/Contents/MacOS/Safari" ];
+            }
+        }
+        elsif ( $^O eq 'haiku' ) {
+            push @candidates, [ AnyBrowser(), '/boot/system/apps/WebPositive' ];
         }
         else {
-            my @path_dirs = split( /:/, $ENV{PATH} // '' );
+            # Linux, BSDs, Solaris/illumos
+            my %seen_dirs;
+            my @path_dirs = grep { defined && length && -d && !$seen_dirs{$_}++ } (
+                split( /:/, $ENV{PATH} // '' ), '/usr/local/bin',    # FreeBSD, OpenBSD, DragonFly
+                '/usr/pkg/bin',                                      # NetBSD pkgsrc
+                '/snap/bin',                                         # Linux Snap
+                '/opt/local/bin'                                     # illumos / MacPorts
+            );
             for my $p (@path_dirs) {
-                push @candidates, [ Chrome(), "$p/google-chrome-stable" ], [ Chrome(), "$p/google-chrome" ], [ Chromium(), "$p/chromium" ],
-                    [ Edge(), "$p/microsoft-edge-stable" ], [ Brave(), "$p/brave-browser" ], [ Firefox(), "$p/firefox" ];
+                push @candidates, [ Chrome(), "$p/google-chrome" ], [ Chrome(), "$p/google-chrome-stable" ], [ Chrome(), "$p/chrome" ],
+                    [ Chromium(), "$p/chromium" ],              [ Chromium(), "$p/chromium-browser" ], [ Edge(),    "$p/microsoft-edge" ],
+                    [ Edge(),     "$p/microsoft-edge-stable" ], [ Brave(),    "$p/brave-browser" ],    [ Firefox(), "$p/firefox" ],
+                    [ Firefox(),  "$p/firefox-esr" ], [ Opera(), "$p/opera" ], [ Vivaldi(), "$p/vivaldi" ], [ Vivaldi(), "$p/vivaldi-stable" ];
             }
         }
-        warn "[DEBUG] _find_browser looking for desired_browser ID: $desired_browser\n";
-        for my $item (@candidates) {
+
+        # Deduplicate paths while preserving search precedence
+        my %seen_candidates;
+        my @unique;
+        for my $c (@candidates) {
+            my $norm_path = ( $^O eq 'MSWin32' ) ? lc( $c->[1] ) : $c->[1];
+            next if $seen_candidates{ $c->[0] . '|' . $norm_path }++;
+            push @unique, $c;
+        }
+        warn "[DEBUG] _find_browser searching for desired_browser ID: $desired_browser";
+        for my $item (@unique) {
             my ( $b_type, $path ) = @$item;
-            my $exists = ( -f $path ) ? 1 : 0;
-            warn "[DEBUG] Candidate check -> Type: $b_type, Path: $path (Exists: $exists)\n" if $exists;
-            if ( $desired_browser == AnyBrowser() || $desired_browser == ChromiumBased() || $desired_browser == $b_type ) {
-                if ($exists) {
-                    warn "[DEBUG] FOUND matching browser: $path (Type: $b_type)\n";
-                    return ( $path, $b_type );
-                }
+            my $exists = ( $^O eq 'MSWin32' ) ? ( -f $path ) : ( -f $path && -x $path );
+            warn "[DEBUG] Candidate check -> Type: $b_type, Path: $path (Exists: $exists)" if $exists;
+            my $matches
+                = ( $desired_browser == AnyBrowser() ) ||
+                ( $desired_browser == ChromiumBased() && _is_chromium_based($b_type) ) ||
+                ( $desired_browser == $b_type );
+            if ( $matches && $exists ) {
+                warn "[DEBUG] FOUND matching browser: $path (Type: $b_type)";
+                return wantarray ? ( $path, $b_type ) : $path;
             }
         }
-        warn "[DEBUG] _find_browser could not find a valid browser matching $desired_browser\n";
-        return ( undef, NoBrowser() );
+        warn "[DEBUG] _find_browser found no matching browser for ID: $desired_browser";
+        return wantarray ? ( undef, NoBrowser() ) : undef;
     }
 };
 1;
