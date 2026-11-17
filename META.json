@@ -1,0 +1,58 @@
+{
+   "abstract" : "Use any web browser or WebView on any platform as your application's GUI.",
+   "author" : [
+      "Sanko Robinson"
+   ],
+   "description" : " ",
+   "dynamic_config" : 1,
+   "generated_by" : "App::mii v1.0.0",
+   "keywords" : [],
+   "license" : [
+      "artistic_2"
+   ],
+   "meta-spec" : {
+      "url" : "https://metacpan.org/pod/CPAN::Meta::Spec",
+      "version" : 2
+   },
+   "name" : "WebUI",
+   "no_index" : {
+      "directory" : [],
+      "file" : [],
+      "namespace" : [],
+      "package" : []
+   },
+   "prereqs" : {
+      "configure" : {
+         "requires" : {
+            "Acme::Parataxis" : "0",
+            "Affix" : "0",
+            "Module::Build::Tiny" : "0.034",
+            "perl" : "v5.40.0"
+         }
+      }
+   },
+   "provides" : {
+      "WebUI" : {
+         "file" : "lib/WebUI.pm",
+         "version" : "v0.0.1"
+      }
+   },
+   "release_status" : "stable",
+   "resources" : {
+      "license" : [
+         "http://www.perlfoundation.org/artistic_license_2_0"
+      ],
+      "repository" : {}
+   },
+   "version" : "v0.0.1",
+   "x_custom_builder" : 0,
+   "x_ignore" : [
+      ".tidyallrc",
+      ".gitignore",
+      ".clang-format",
+      ".github/**"
+   ],
+   "x_plugins" : [
+      "GitHubActions"
+   ]
+}
