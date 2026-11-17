@@ -284,13 +284,18 @@ package WebUI v0.0.1 {
         }
         else {
             # Linux, BSDs, Solaris/illumos
+            my @raw_dirs = split( /:/, $ENV{PATH} // '' );
+
+            # Only fall back to system defaults if PATH is completely undefined/empty
+            @raw_dirs = (
+                '/usr/local/bin',    # FreeBSD, OpenBSD, DragonFly
+                '/usr/pkg/bin',      # NetBSD pkgsrc
+                '/snap/bin',         # Linux Snap
+                '/opt/local/bin'
+                )                    # illumos / MacPorts
+                unless @raw_dirs;
             my %seen_dirs;
-            my @path_dirs = grep { defined && length && -d && !$seen_dirs{$_}++ } (
-                split( /:/, $ENV{PATH} // '' ), '/usr/local/bin',    # FreeBSD, OpenBSD, DragonFly
-                '/usr/pkg/bin',                                      # NetBSD pkgsrc
-                '/snap/bin',                                         # Linux Snap
-                '/opt/local/bin'                                     # illumos / MacPorts
-            );
+            my @path_dirs = grep { defined && length && -d && !$seen_dirs{$_}++ } @raw_dirs;
             for my $p (@path_dirs) {
                 push @candidates, [ Chrome(), "$p/google-chrome" ], [ Chrome(), "$p/google-chrome-stable" ], [ Chrome(), "$p/chrome" ],
                     [ Chromium(), "$p/chromium" ],              [ Chromium(), "$p/chromium-browser" ], [ Edge(),    "$p/microsoft-edge" ],
