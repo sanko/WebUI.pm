@@ -21,6 +21,10 @@ package WebUI v0.0.1 {
     }
 
     sub show( $win, $uri ) {
+        my ( $path, $browser ) = _find_browser( AnyBrowser() );
+
+        # If no installed browser is found, just start the service headlessly so clients can connect directly via get_url($win) or open_url()
+        return show_browser( $win, $uri, $path ? $browser : NoBrowser() );
     }
     sub show_browser( $win, $uri )                { }
     sub show_wv( $win, $uri )                     { }
@@ -207,6 +211,7 @@ package WebUI v0.0.1 {
     }
 
     sub _find_browser ( $desired_browser = AnyBrowser() ) {
+        return wantarray ? ( undef, NoBrowser() ) : undef if $desired_browser == NoBrowser();    # Don't even bother...
         my @candidates;
         if ( $^O eq 'MSWin32' ) {
             my $sys_drive = $ENV{'SystemDrive'} || 'C:';
